@@ -18,5 +18,5 @@ from django.contrib import admin
 
 urlpatterns = [
     url(r'^admin/', admin.site.urls),
-    url(r'^railsBank/', include('apis.urls'))
+    url(r'^apis/', include('apis.urls'))
 ]

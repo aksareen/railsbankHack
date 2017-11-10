@@ -1,6 +1,27 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
+from django.utils.encoding import python_2_unicode_compatible
 
 from django.db import models
 
-# Create your models here.
+
+@python_2_unicode_compatible
+class Users(models.Model):
+    username = models.CharField('Username', max_length=30)
+    password = models.CharField('Password', max_length=256)
+    enduser_id = models.CharField('End User Id', primary_key=True, max_length=200)
+    email = models.EmailField('Email')
+
+    def __str__(self):
+        return self.enduser_id
+
+
+@python_2_unicode_compatible
+class BankAccounts(models.Model):
+    user = models.ForeignKey(Users, on_delete=models.CASCADE, verbose_name="the related User")
+    ledger_id = models.CharField('Ledger Id', max_length=256)
+    preference = models.IntegerField('Preference', default=100) # order of preference
+    account_name = models.CharField('Account Name', max_length=256)
+
+    def __str__(self):
+        return self.ledger_id
