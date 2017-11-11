@@ -1,8 +1,10 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
+import json
 from railsBank.settings import RAILSBANK_API_KEYS
 from apis.models import Users, BankAccounts
+import pprint
 
 # Create your views here.
 from django.http import HttpResponse
@@ -30,22 +32,29 @@ def get_csrf_token(request):
 @csrf_exempt
 def add_user(request):
     if request.method == "POST":
-        body = request.body
+        body = json.loads(request.body)
         email = body["person"]["email"]
         username = body["person"]["username"]
-        body["person"].__delattr__('username')
+        del body["person"]["username"]
 
+        print("body: {}".format(body))
         url = 'https://play.railsbank.com/v1/customer/endusers'
         headers = {'Content-Type': 'application/json',
                    'Accept': 'application/json',
                    'Authorization': RAILSBANK_API_KEYS}
         try:
-            resp = requests.post(url=url, data=body, headers=headers)
+            resp = requests.post(url=url, json=body, headers=headers)
         except Exception as e:
             print("{}".format(e))
             content = {"error": "{}".format(e)}
             return HttpResponse(content, content_type="application/json", status=400)
 
-        new_user = Users()
-
-        return HttpResponse(resp, status=200, content_type="application/json")
+        if resp.status_code == requests.codes.ok:
+            print("response: type : {} , body: {}".format(type(resp), resp.json()))
+            enduser_id = resp.json().get("enduser_id")
+            print("EndUser: {}".format(enduser_id))
+            new_user = Users(username=username, password="1234", enduser_id=enduser_id, email=email)
+            new_user.save()
+            return HttpResponse(resp, status=200, content_type="application/json")
+        else:
+            return HttpResponse(resp, content_type="application/json", status=400)
