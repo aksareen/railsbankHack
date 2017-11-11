@@ -8,7 +8,7 @@ from django.db import models
 @python_2_unicode_compatible
 class Users(models.Model):
     username = models.CharField('Username', max_length=30)
-    password = models.CharField('Password', max_length=256)
+    password = models.CharField('Password', max_length=256, null=True)
     enduser_id = models.CharField('End User Id', primary_key=True, max_length=200)
     email = models.EmailField('Email')
 

@@ -101,6 +101,10 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 
+RAILSBANK_API_KEYS = "API-Key zCfdxCd10KIIdOWt5bpLx5GqO8I9LueG#xL0lQu" \
+                     "rJSHC7W4hbL0JUj3wsLYFhioaC7tV0YWxEt5NyRhIrpT" \
+                     "B4JsCgEFL6qQZH"
+
 # Internationalization
 # https://docs.djangoproject.com/en/1.11/topics/i18n/
 
