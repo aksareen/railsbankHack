@@ -20,7 +20,7 @@ class Users(models.Model):
 @python_2_unicode_compatible
 class BankAccounts(models.Model):
     user = models.ForeignKey(Users, on_delete=models.CASCADE, verbose_name="the related User")
-    ledger_id = models.CharField('Ledger Id', max_length=256)
+    ledger_id = models.CharField('Ledger Id', unique=True, max_length=256)
     preference = models.IntegerField('Preference', default=1)  # order of preference
     iban = models.CharField('IBAN', max_length=100)
     swift_code = models.CharField('Swift Code', max_length=50)

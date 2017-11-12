@@ -342,6 +342,116 @@ def get_user_details(request):
 
 
 @csrf_exempt
+def handle_transaction(request):
+    if request.method != "POST":
+        return HttpResponse("only POST operations permitted",
+                            content_type="text/plain",
+                            status=400)
+    try:
+        body = json.loads(request.body)
+    except Exception as e:
+        return _default400(e)
+
+    amount = body["amount"]
+
+    if amount <= 0:
+        return HttpResponse(status=400, content_type="application/json",
+                            content=json.dumps({"error": "amount has to be positive"}))
+
+    buyer_id = body["buyer_username"]
+    seller_id = body["seller_username"]
+
+    buyer_user = Users.objects.get(username=buyer_id)
+    seller_user = Users.objects.get(username=seller_id)
+
+    buyer_accs = []
+    for trans in buyer_user.bankaccounts_set.order_by('preference'):
+        logger.debug(trans)
+        buyer_accs.append(trans)
+
+    seller_accs = None
+    for trans in seller_user.bankaccounts_set.all():
+        seller_accs = trans
+        break
+
+    logger.debug("Buyer accounts : {}".format(buyer_accs))
+    logger.debug("Seller accounts: {}".format(seller_accs))
+    ledger_seller_id = seller_accs.ledger_id
+
+    total_buyer_amt = 0
+    acc = []
+    for trans in buyer_accs:
+        url = "https://play.railsbank.com/v1/customer/ledgers/{}".format(trans.ledger_id)
+        respo = _rails_bank_post_request({}, url=url, is_get=True)
+        # cannot fail
+        ledger_details = respo.json()
+        acc.append({"preference": trans.preference, "ledger_details": ledger_details})
+        total_buyer_amt += ledger_details["amount"]
+
+    logger.debug("Seller Price {} , Buyer Total amount {}".format(amount, total_buyer_amt))
+
+    if amount > total_buyer_amt:
+        resp = json.dumps({"warning": "Insufficient balance. will go into overdraft"})
+        return HttpResponse(status=400, content=resp, content_type="application/json")
+
+    transfer_amount = amount
+
+    accounts = iter(acc)
+    money_saved = transfer_amount - acc[0]["ledger_details"]["amount"]
+
+    transactions_list = []
+    while transfer_amount > 0:
+        account_i = next(accounts)
+        amt = min(transfer_amount, account_i["ledger_details"]["amount"])
+        if amt <= 0:
+            continue
+        transfer_amount -= amt
+        do_trans = {"ledger_id": account_i["ledger_details"]["ledger_id"], "amount": amt}
+        transactions_list.append(do_trans)
+
+    url = "https://play.railsbank.com/v1/customer/transactions/inter-ledger"
+    for trans in transactions_list:
+        a = {
+            "ledger_from_id": trans["ledger_id"],
+            "ledger_to_id": ledger_seller_id,
+            "amount": trans["amount"]
+        }
+
+        resp = _rails_bank_post_request(a, url=url, is_json=True)
+        logger.info("transaction: {}".format(resp.json()))
+        if resp.status_code != requests.codes.ok:
+            logger.error("Couldn't send request: {}".format(resp.content))
+
+    return HttpResponse(status=200, content="Successfull transaction", content_type="application/json")
+
+
+@csrf_exempt
+def credit_account(request):
+    if request.method != "POST":
+        return HttpResponse("only POST operations permitted",
+                            content_type="text/plain",
+                            status=400)
+    try:
+        body = json.loads(request.body)
+    except Exception as e:
+        return _default400(e)
+
+    amount = body["amount"]
+    bic_swift = body["bic_swift"]
+    iban = body["iban"]
+
+    data = {"amount": amount, "bic_swift": bic_swift, "iban": iban}
+    url = "https://play.railsbank.com/dev/customer/transactions/receive"
+    responsed = _rails_bank_post_request(data, url, is_json=True)
+
+    if responsed.status_code != requests.codes.ok:
+        logger.error("Could not create ledger: {}".format(responsed.status_code))
+        return HttpResponse(resp, content_type="application/json", status=400)
+
+    return HttpResponse(responsed.content, status=200)
+
+
+@csrf_exempt
 def get_bank_accounts(request):
     if request.method != "POST":
         return HttpResponse("only POST operations permitted",
@@ -362,10 +472,18 @@ def get_bank_accounts(request):
         acc = {}
         acc["user"] = enduser_id
         acc["ledger_id"] = bank_accs.ledger_id
+        url = "https://play.railsbank.com/v1/customer/ledgers/{}".format(bank_accs.ledger_id)
+        respo = _rails_bank_post_request({}, url=url, is_get=True)
+        # cannot fail
+        lddet = respo.json()
+        # acc["ledger_details"] = lddet
+        acc["amount"] = lddet["amount"]
+
         acc["preference"] = bank_accs.preference
         acc["iban"] = bank_accs.iban
         acc["swift_code"] = bank_accs.swift_code
         acc["account_name"] = bank_accs.account_name
+
         resp_list.append(acc)
     rsp = json.dumps({"accounts": resp_list})
     logger.info(rsp)
