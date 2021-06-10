@@ -1,6 +1,6 @@
 certifi==2017.11.5
 chardet==3.0.4
-Django==1.11.7
+Django==2.2.24
 idna==2.6
 pprint==0.1
 pytz==2017.3
